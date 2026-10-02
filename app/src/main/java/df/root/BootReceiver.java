@@ -12,7 +12,7 @@ public class BootReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (new File("/dev/df").exists() || new File("/dev/dfi").exists()) {
+        if (new File("/dev/df").exists() || new File("/dev/dfs").exists()) {
             Log.i(TAG, "boot: root stage already started, skipping");
             return;
         }

@@ -2,15 +2,20 @@
 dir=/data/local/tmp/dfroot-shell
 umask 007
 
-mkdir -p "$dir" || exit 1
-: > "$dir/in" || exit 1
-: > "$dir/out" || exit 1
-chmod 0770 "$dir" || exit 1
-chmod 0660 "$dir/in" "$dir/out" || exit 1
-chown 0:2000 "$dir" "$dir/in" "$dir/out" || exit 1
-id > "$dir/status"
-chmod 0644 "$dir/status"
-setprop debug.dfroot.ready 1
+fail() {
+    rc=$?
+    setprop debug.dfroot.error "$1:$rc"
+    exit "$rc"
+}
+
+setprop debug.dfroot.error ''
+mkdir -p "$dir" || fail mkdir
+: > "$dir/in" || fail create_in
+: > "$dir/out" || fail create_out
+chmod 0660 "$dir/in" "$dir/out" || fail mode_channels
+id > "$dir/status" || fail write_status
+chmod 0644 "$dir/status" || fail mode_status
+setprop debug.dfroot.ready 1 || fail ready_property
 
 while true; do
     if [ ! -s "$dir/in" ]; then

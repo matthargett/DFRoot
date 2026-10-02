@@ -152,7 +152,6 @@ static int marker_exists(const char *path) {
 
 static int wait_for_init_shell(struct Reporter *reporter, int timeout_ms) {
     static const struct ResultMarker failures[] = {
-        {"/dev/dfW", "embedded command script write failed", 1},
         {"/dev/dfE", "shell SELinux transition failed", 1},
         {"/dev/dfG", "shell group transition failed", 1},
         {"/dev/dfX", "root command script exec failed", 1},
@@ -167,8 +166,14 @@ static int wait_for_init_shell(struct Reporter *reporter, int timeout_ms) {
             REPORTLN("***SUCCESS***");
             return 0;
         }
+        char error[PROP_VALUE_MAX] = {0};
+        if (__system_property_get("debug.dfroot.error", error) > 0
+                && error[0] != '\0') {
+            REPORTLN("init shell failed: setup stage=%s", error);
+            return 1;
+        }
         if (!stage_reported && marker_exists("/dev/dfR")) {
-            REPORTLN("init child staged embedded command script");
+            REPORTLN("init child prepared embedded command");
             stage_reported = 1;
         }
         for (size_t i = 0; i < sizeof(failures) / sizeof(failures[0]); i++) {
@@ -210,6 +215,11 @@ int run_init_strategy(struct DirtyFragWriter *writer,
     if (!target) {
         REPORTLN("init strategy blocked: no exact target");
         return result;
+    }
+    if (marker_exists("/dev/dfs")) {
+        REPORTLN("init strategy blocked: /dev/dfs already exists in the app mount namespace");
+        REPORTLN("next step: reboot once to clear the one-shot init state, then run again");
+        return 2;
     }
     dirtyfrag_writer_set_paths(writer, crash_dump_path, target->carrier_path);
     REPORTLN("init target=%s carrier=%s payload=%u",

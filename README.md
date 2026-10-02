@@ -84,7 +84,7 @@ Current declarative userspace targets:
 
 | Target | Evidence state |
 |---|---|
-| `init-shell-da101ea6` | Exact-build predecessor live verified a UID 0 command channel; composed target awaits the final fleet retest |
+| `init-shell-da101ea6` | Composed target live verified a UID 0 command channel and exact restoration |
 | `adbd-fd30e626` | Live verified UID 0 daemon and exact restoration |
 | `adbd-e52b5144` | Exact offline kernel and userspace analysis; live chain untested |
 
