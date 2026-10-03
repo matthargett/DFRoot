@@ -21,7 +21,7 @@ final class DirectKernelRunner {
             throws Exception {
         DirectKernelTarget target = match.target;
         DirectKernelTarget.Probe probe = target.probe;
-        reporter.report("direct-kernel dry probe: target=" + target.id
+        reporter.report("direct-kernel provider probe: target=" + target.id
                 + " timeout=" + probe.timeoutSeconds + "s\n");
         MarkerState markers = new MarkerState(probe.successMarkers,
                 java.util.Collections.emptyList(), java.util.Collections.emptyList());
@@ -32,12 +32,12 @@ final class DirectKernelRunner {
         if (!exited) {
             process.destroyForcibly();
             output.join(2000);
-            reporter.report("direct-kernel dry probe failed: timed out\n");
+            reporter.report("direct-kernel provider probe failed: timed out\n");
             return false;
         }
         output.join(2000);
         boolean exact = process.exitValue() == 0 && markers.allProbeMarkersSeen();
-        reporter.report("direct-kernel dry probe result: exit=" + process.exitValue()
+        reporter.report("direct-kernel provider probe result: exit=" + process.exitValue()
                 + " exact_markers=" + markers.probeMarkerCount() + "/"
                 + probe.successMarkers.size() + " verdict="
                 + (exact ? "exact" : "failed_or_ambiguous") + "\n");
@@ -51,7 +51,7 @@ final class DirectKernelRunner {
         DirectKernelTarget target = match.target;
         DirectKernelTarget.Run run = target.run;
         if (!probe(context, match, reporter)) {
-            reporter.report("direct-kernel exploit blocked: dry probe did not prove the exact target\n");
+            reporter.report("direct-kernel exploit blocked: provider probe did not prove the declared target\n");
             return ExploitRunner.RESULT_PROBE_FAILED;
         }
         if ("shell".equals(run.executionDomain)) {
@@ -67,7 +67,7 @@ final class DirectKernelRunner {
             MarkerState markers = new MarkerState(
                     java.util.Collections.emptyList(), run.successMarkers,
                     run.retryableMarkers);
-            Process process = start(match, java.util.Collections.emptyList(),
+            Process process = start(match, run.arguments,
                     run.environment);
             Thread output = collect(process, reporter, markers, "run");
             long deadline = System.nanoTime()

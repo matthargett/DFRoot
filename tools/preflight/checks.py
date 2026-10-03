@@ -135,6 +135,24 @@ def check_direct(snapshot: dict[str, object]) -> Finding:
             f"target={target['id']}; provider hash mismatch observed={observed}",
             "remove the mismatched provider; never substitute a different build",
         )
+    asset_root = (ROOT / "app/src/main/assets").resolve()
+    for support in target.get("support_files", []):
+        support_path = (asset_root / support["asset"]).resolve()
+        if asset_root not in support_path.parents or not support_path.is_file():
+            return Finding(
+                "block",
+                "Direct-kernel route",
+                f"target={target['id']}; support file is missing: {support['file']}",
+                "restore the exact declared support file before running the provider",
+            )
+        support_hash = hashlib.sha256(support_path.read_bytes()).hexdigest()
+        if support_hash != support["sha256"]:
+            return Finding(
+                "block",
+                "Direct-kernel route",
+                f"target={target['id']}; support hash mismatch file={support['file']} observed={support_hash}",
+                "remove the mismatched support file; never substitute bytes from another build",
+            )
     run = target["run"]
     configured = ""
     if expected:
@@ -152,6 +170,7 @@ def check_direct(snapshot: dict[str, object]) -> Finding:
         "pass",
         "Direct-kernel route",
         f"target={target['id']}; provider_sha256={observed}; "
+        f"support_files={len(target.get('support_files', []))}; "
         f"execution_domain={run['execution_domain']}; PFN observed={hex_range(physical)}{configured}",
         next_step,
     )

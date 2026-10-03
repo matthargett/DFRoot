@@ -7,9 +7,7 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.InputStream;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,10 +17,13 @@ final class DirectKernelRegistry {
     static final class Match {
         final DirectKernelTarget target;
         final File payload;
+        final List<ProviderBundle.Entry> supportFiles;
 
-        Match(DirectKernelTarget target, File payload) {
+        Match(DirectKernelTarget target, File payload,
+              List<ProviderBundle.Entry> supportFiles) {
             this.target = target;
             this.payload = payload;
+            this.supportFiles = supportFiles;
         }
     }
 
@@ -71,7 +72,7 @@ final class DirectKernelRegistry {
             }
             String observed;
             try {
-                observed = sha256(payload);
+                observed = Sha256.file(payload);
             } catch (Exception error) {
                 reporter.report("candidate " + target.id
                         + " rejected: provider hash failed error=" + error + "\n");
@@ -91,11 +92,19 @@ final class DirectKernelRegistry {
             }
             reporter.report("direct-kernel provider: path=" + payload
                     + " sha256=exact executable=yes\n");
-            return new Match(target, payload);
+            List<ProviderBundle.Entry> supportFiles;
+            try {
+                supportFiles = ProviderBundle.stage(context, target, reporter);
+            } catch (Exception error) {
+                reporter.report("candidate " + target.id
+                        + " rejected: support staging failed error=" + error + "\n");
+                continue;
+            }
+            return new Match(target, payload, supportFiles);
         }
         if (!identityMatched) {
-            reporter.report("direct-kernel strategy: no descriptor declares this exact device, fingerprint, patch level, incremental, and kernel release\n");
-            reporter.report("NEXT: add a target only after a dry probe reports exact offsets and a live run proves a fresh UID 0 shell\n");
+            reporter.report("direct-kernel strategy: no descriptor matches this canonical build identity\n");
+            reporter.report("NEXT: add a target only after a provider probe validates its exact inputs and a live run proves a fresh UID 0 shell\n");
         }
         return null;
     }
@@ -110,7 +119,8 @@ final class DirectKernelRegistry {
             raw = output.toByteArray();
         }
         JSONObject root = new JSONObject(new String(raw, java.nio.charset.StandardCharsets.UTF_8));
-        if (root.getInt("schema_version") != 1)
+        int version = root.getInt("schema_version");
+        if (version != 1 && version != 2)
             throw new IllegalArgumentException("unsupported schema version");
         JSONArray array = root.getJSONArray("targets");
         List<DirectKernelTarget> targets = new ArrayList<>();
@@ -119,16 +129,4 @@ final class DirectKernelRegistry {
         return targets;
     }
 
-    private static String sha256(File file) throws Exception {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        try (InputStream input = new FileInputStream(file)) {
-            byte[] buffer = new byte[8192];
-            for (int count; (count = input.read(buffer)) != -1; )
-                digest.update(buffer, 0, count);
-        }
-        StringBuilder hex = new StringBuilder(64);
-        for (byte value : digest.digest())
-            hex.append(String.format(java.util.Locale.ROOT, "%02x", value & 0xff));
-        return hex.toString();
-    }
 }

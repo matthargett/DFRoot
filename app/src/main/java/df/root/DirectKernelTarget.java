@@ -16,15 +16,18 @@ final class DirectKernelTarget {
     final String id;
     final Identity identity;
     final Provider provider;
+    final List<SupportFile> supportFiles;
     final PhysicalRange physicalRange;
     final Probe probe;
     final Run run;
 
     private DirectKernelTarget(String id, Identity identity, Provider provider,
+                               List<SupportFile> supportFiles,
                                PhysicalRange physicalRange, Probe probe, Run run) {
         this.id = id;
         this.identity = identity;
         this.provider = provider;
+        this.supportFiles = supportFiles;
         this.physicalRange = physicalRange;
         this.probe = probe;
         this.run = run;
@@ -38,12 +41,20 @@ final class DirectKernelTarget {
                 id,
                 parseIdentity(json),
                 parseProvider(json.getJSONObject("payload")),
+                parseSupportFiles(json.optJSONArray("support_files")),
                 parsePhysicalRange(json.optJSONObject("physical_pfn_range")),
                 parseProbe(json.getJSONObject("probe")),
                 parseRun(json.getJSONObject("run")));
     }
 
     private static Identity parseIdentity(JSONObject json) throws JSONException {
+        String digest = json.optString("identity_sha256", "")
+                .toLowerCase(Locale.ROOT);
+        if (!digest.isEmpty()) {
+            if (!digest.matches("[0-9a-f]{64}"))
+                throw new JSONException("invalid identity SHA-256");
+            return new Identity(digest, null, null, null, null, null);
+        }
         String incremental = json.getString("build_incremental");
         String fingerprint = json.getString("build_fingerprint");
         String device = json.getString("device");
@@ -52,8 +63,8 @@ final class DirectKernelTarget {
         if (incremental.isEmpty() || fingerprint.isEmpty() || device.isEmpty()
                 || securityPatch.isEmpty() || kernelRelease.isEmpty())
             throw new JSONException("identity fields must be nonempty");
-        return new Identity(incremental, fingerprint, device, securityPatch,
-                kernelRelease);
+        return new Identity(null, incremental, fingerprint, device,
+                securityPatch, kernelRelease);
     }
 
     private static Provider parseProvider(JSONObject json) throws JSONException {
@@ -64,6 +75,31 @@ final class DirectKernelTarget {
         if (!sha256.matches("[0-9a-f]{64}"))
             throw new JSONException("invalid provider SHA-256");
         return new Provider(file, sha256);
+    }
+
+    private static List<SupportFile> parseSupportFiles(JSONArray json)
+            throws JSONException {
+        if (json == null) return Collections.emptyList();
+        List<SupportFile> files = new ArrayList<>();
+        for (int i = 0; i < json.length(); i++) {
+            JSONObject item = json.getJSONObject(i);
+            String asset = item.getString("asset");
+            String file = item.getString("file");
+            String sha256 = item.getString("sha256").toLowerCase(Locale.ROOT);
+            if (!asset.matches("providers/[A-Za-z0-9._/-]+")
+                    || asset.contains("..") || asset.endsWith("/"))
+                throw new JSONException("invalid support asset: " + asset);
+            if (!file.matches("[A-Za-z0-9._-]+"))
+                throw new JSONException("invalid support filename: " + file);
+            if (!sha256.matches("[0-9a-f]{64}"))
+                throw new JSONException("invalid support SHA-256");
+            for (SupportFile existing : files)
+                if (existing.file.equals(file))
+                    throw new JSONException("duplicate support filename: " + file);
+            files.add(new SupportFile(asset, file, sha256,
+                    item.optBoolean("executable", false)));
+        }
+        return Collections.unmodifiableList(files);
     }
 
     private static PhysicalRange parsePhysicalRange(JSONObject json)
@@ -114,6 +150,7 @@ final class DirectKernelTarget {
         if (successMarkers.isEmpty())
             throw new JSONException("run success markers must be nonempty");
         return new Run(
+                strings(json.optJSONArray("arguments")),
                 environment(json.getJSONObject("environment")),
                 successMarkers,
                 strings(json.getJSONArray("retryable_markers")),
@@ -138,6 +175,7 @@ final class DirectKernelTarget {
     }
 
     private static List<String> strings(JSONArray array) throws JSONException {
+        if (array == null) return Collections.emptyList();
         List<String> values = new ArrayList<>();
         for (int i = 0; i < array.length(); i++) {
             String value = array.getString(i);
@@ -162,19 +200,36 @@ final class DirectKernelTarget {
     }
 
     static final class Identity {
+        final String sha256;
         final String buildIncremental;
         final String buildFingerprint;
         final String device;
         final String securityPatch;
         final String kernelRelease;
 
-        Identity(String buildIncremental, String buildFingerprint, String device,
+        Identity(String sha256, String buildIncremental, String buildFingerprint, String device,
                  String securityPatch, String kernelRelease) {
+            this.sha256 = sha256;
             this.buildIncremental = buildIncremental;
             this.buildFingerprint = buildFingerprint;
             this.device = device;
             this.securityPatch = securityPatch;
             this.kernelRelease = kernelRelease;
+        }
+    }
+
+    static final class SupportFile {
+        final String asset;
+        final String file;
+        final String sha256;
+        final boolean executable;
+
+        SupportFile(String asset, String file, String sha256,
+                    boolean executable) {
+            this.asset = asset;
+            this.file = file;
+            this.sha256 = sha256;
+            this.executable = executable;
         }
     }
 
@@ -223,6 +278,7 @@ final class DirectKernelTarget {
     }
 
     static final class Run {
+        final List<String> arguments;
         final Map<String, String> environment;
         final List<String> successMarkers;
         final List<String> retryableMarkers;
@@ -232,10 +288,12 @@ final class DirectKernelTarget {
         final int maximumAttempts;
         final int retryDelayMs;
 
-        Run(Map<String, String> environment, List<String> successMarkers,
+        Run(List<String> arguments, Map<String, String> environment,
+            List<String> successMarkers,
             List<String> retryableMarkers, String executionDomain,
             String executionDomainReason, int startupTimeoutSeconds,
             int maximumAttempts, int retryDelayMs) {
+            this.arguments = arguments;
             this.environment = environment;
             this.successMarkers = successMarkers;
             this.retryableMarkers = retryableMarkers;

@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "targets": [
     {
       "id": "android10-4.4.205-49845030443200410",
@@ -24,7 +24,9 @@
         "on_app_permission_denied": "use_descriptor"
       },
       "probe": {
-        "arguments": ["--dry-offsets"],
+        "arguments": [
+          "--dry-offsets"
+        ],
         "success_markers": [
           "incremental match=1 49845030443200410",
           "match=1 release=4.4.205-perf+",
@@ -75,6 +77,71 @@
         "startup_timeout_seconds": 240,
         "maximum_attempts": 2,
         "retry_delay_ms": 1000
+      },
+      "identity_sha256": "286a35aea5bb8d3562a5ff92bee888e899fa9dd0efb89d61ad9726fb94ff4772"
+    },
+    {
+      "id": "target-4549c731deb8284f",
+      "identity_sha256": "4549c731deb8284fd1b26b5af31ad68c55a472fcb3c47e5442fd618caee89e34",
+      "payload": {
+        "file": "libdfroot_provider_4549c731deb8284f.so",
+        "sha256": "7f1a2431a31665bf1fcc23ddeaa61a008ba060403cd907b894bacdc2320d04bb",
+        "distribution": "bundled",
+        "source_revision": "2324ce262e674504ad41ec82abcda3bf09dd01e6"
+      },
+      "support_files": [
+        {
+          "asset": "providers/4549c731deb8284f/target.json",
+          "file": "target.json",
+          "sha256": "e9e92a23d3394ee7585ff62afef1ba3bf1f55eda3057eb9bed443fb420265372"
+        },
+        {
+          "asset": "providers/4549c731deb8284f/input-a.bin",
+          "file": "input-a.bin",
+          "sha256": "1275792f2a1e1802bad7c2a9169650705fc096197092d6b1629acceb76dc6e1a"
+        },
+        {
+          "asset": "providers/4549c731deb8284f/input-b.bin",
+          "file": "input-b.bin",
+          "sha256": "96ca08068a26b2e796c3e3960bf9308c3965a5d7be3a601425f92295368a9cb7"
+        },
+        {
+          "asset": "providers/4549c731deb8284f/input-c.bin",
+          "file": "input-c.bin",
+          "sha256": "d2177a8ddaf25bee0f66a1ebd98b0d91ca386ec6cb47ac5dc946de451bcdb297"
+        }
+      ],
+      "probe": {
+        "arguments": [
+          "--help"
+        ],
+        "success_markers": [
+          "Target-driven DirtyFrag LPE provider",
+          "usage: provider -t <target.json> --local --adb-root [options]"
+        ],
+        "timeout_seconds": 10
+      },
+      "run": {
+        "arguments": [
+          "--local",
+          "-t",
+          "{bundle}/target.json",
+          "--adb-root",
+          "--settle",
+          "0.3"
+        ],
+        "execution_domain": "shell",
+        "execution_domain_reason": "the provider must use the shell service identity and trigger privileged system services",
+        "environment": {},
+        "success_markers": [
+          "SELinux Enforcing -> Permissive",
+          "cred-patched -> NEW adb shells are uid 0 + all caps + kernel context",
+          "stager stopped (SA reaped)"
+        ],
+        "retryable_markers": [],
+        "startup_timeout_seconds": 60,
+        "maximum_attempts": 1,
+        "retry_delay_ms": 1
       }
     }
   ]

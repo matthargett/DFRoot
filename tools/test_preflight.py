@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -20,6 +22,24 @@ from preflight.parsers import (
 
 
 class PreflightTest(unittest.TestCase):
+    def test_bundled_provider_inputs_match_manifest(self) -> None:
+        root = TOOLS.parent
+        assets = root / "app/src/main/assets"
+        registry = json.loads((assets / "direct-kernel-targets.json").read_text())
+
+        self.assertEqual(2, registry["schema_version"])
+        for target in registry["targets"]:
+            payload = target["payload"]
+            if payload.get("distribution") != "bundled":
+                continue
+            provider = root / "app/src/main/jniLibs/arm64-v8a" / payload["file"]
+            self.assertEqual(payload["sha256"], hashlib.sha256(provider.read_bytes()).hexdigest())
+            for support in target.get("support_files", []):
+                path = assets / support["asset"]
+                self.assertEqual(
+                    support["sha256"], hashlib.sha256(path.read_bytes()).hexdigest()
+                )
+
     def test_iomem_preserves_disjoint_system_ram(self) -> None:
         parsed = parse_iomem(
             {

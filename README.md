@@ -49,10 +49,10 @@ The app selects one exact strategy at runtime:
 3. A protected daemon target is selected by kernel release and an exact bridge
    identity, then checked through protected build-ID, file-end, and patch
    preimage blocks before any target byte is changed.
-4. An external direct-kernel provider is selected by exact device, fingerprint,
-   security patch, build incremental, kernel release, provider SHA-256, and any
-   declared physical PFN envelope.
-   Its dry probe must emit every declared offset marker before a live attempt.
+4. An external direct-kernel provider is selected by a SHA-256 over fingerprint,
+   security patch, build incremental, and kernel release, plus the provider and
+   support-file SHA-256 values and any declared physical PFN envelope.
+   Its probe must emit every declared marker before a live attempt.
    The descriptor also declares whether the proven execution domain is the app
    or ADB shell; the app does not retry a provider in a domain that cannot meet
    its prerequisites.
@@ -103,6 +103,7 @@ Current declarative userspace targets:
 | `adbd-fd30e626` | Live verified UID 0 daemon and exact restoration |
 | `adbd-e52b5144` | Exact offline kernel and userspace analysis; live chain untested |
 | `android10-4.4.205-49845030443200410` | Live verified fresh UID 0 ADB shell through the generated shell-domain launcher |
+| `target-4549c731deb8284f` | Source revision live verified twice; bundled artifact selection, hashes, probe, and stage-only launcher verified separately |
 
 ## How it works
 
@@ -165,16 +166,16 @@ adb shell run-as df.root cat \
 
 When an exact descriptor requires the ADB shell domain, the probe writes and
 prints one launcher command. The generated script rechecks the running build,
-provider SHA-256, shell-visible PFN envelope, and all dry-probe markers. Whole
-attempts repeat only after the provider's exact clean allocator-exhaustion
-marker. A fresh `adb shell` must still prove UID, context, SELinux state, and
-the `adbd` credential change.
+provider and support-file SHA-256 values, shell-visible PFN envelope, and every
+probe marker. Use the printed `DFROOT_STAGE_ONLY=1` command to validate the
+whole staging path without executing the exploit. Whole attempts repeat only
+after a declared clean-failure marker. A fresh `adb shell` must still prove
+UID, context, SELinux state, and the `adbd` credential change.
 
-Direct-kernel provider binaries are not committed by this project. Their local
-filenames are ignored by default. Obtain an exact provider under compatible
-terms, verify the descriptor's SHA-256, and package it in the declared
-`jniLibs/arm64-v8a` path. A build without that exact file reports the missing
-provider and does not substitute another binary.
+Direct-kernel providers remain independent implementations behind one target
+schema. A bundled provider carries its license notice and hash-selected support
+files. An unbundled descriptor reports the exact missing filename and SHA-256;
+the app never substitutes a different build.
 
 For a read-only host-side inventory of exploit routes, physical PFN ranges,
 SELinux and module state, CPU PMU controls, KGSL, profiler tools, and Vulkan/GLES

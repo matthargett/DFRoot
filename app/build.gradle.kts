@@ -56,6 +56,10 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            keepDebugSymbols += setOf(
+                "**/libdfroot_provider_*.so",
+                "**/libdfroot_direct_kernel_*.so",
+            )
         }
     }
 }
