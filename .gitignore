@@ -8,6 +8,7 @@ app/.cxx/
 local.properties
 *.iml
 .idea/
+__pycache__/
 dirtyfrag-lkm/*.cmd
 dirtyfrag-lkm/*.o
 dirtyfrag-lkm/*.mod
@@ -15,3 +16,4 @@ dirtyfrag-lkm/*.mod.c
 dirtyfrag-lkm/*.lto.o
 dirtyfrag-lkm/modules.order
 dirtyfrag-lkm/Module.symvers
+app/src/main/jniLibs/arm64-v8a/libdfroot_direct_kernel_*.so

@@ -37,6 +37,29 @@ Ephemeral root for Samsung devices (and possibly others) w/ locked bootloaders v
 | android16-6.12 | Yes |
 | android17-6.18 | Untested |
 
+### Runtime discovery
+
+The app composes carrier paths from generic directory prefixes, suffixes, and
+filenames in `runtime-discovery-policy.json`. It does not select a route from a
+product name, model, build fingerprint, or precomputed device digest.
+
+The host preflight uses the same policy over ADB and classifies bounded
+candidates using file metadata, SELinux context, ELF class, module vermagic,
+ELF relocation records, boot configuration grammar, BTF, kallsyms, and module
+section visibility. A content digest is recorded only after discovery so a
+specific transaction can verify and restore the bytes it actually examined.
+
+```sh
+python3 tools/device_preflight.py SERIAL
+python3 tools/device_preflight.py SERIAL --format json
+python3 tools/device_preflight.py SERIAL --live-cpu
+```
+
+The report marks each derived step as proved, ready, needed, or ambiguous. It
+prints concrete relocation and configuration offsets when available and names
+the missing evidence when address sources are redacted. Discovery performs no
+exploit, module load, property write, or SELinux change.
+
 ## How it works
 
 The Android kernel decrypts AES-CBC ESP packets directly into the page cache of files open for `splice()`. By crafting `IV = AES_ECB_DEC(key, current_content) ⊕ desired_content`, any 16-byte-aligned block in a mapped shared library can be overwritten without write permission and without copy-on-write.
@@ -72,4 +95,3 @@ https://github.com/tiann/KernelSU/actions/runs/35973514328
 ./build.sh
 adb install -r dirtyfrag.apk
 ```
-
