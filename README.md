@@ -176,6 +176,22 @@ terms, verify the descriptor's SHA-256, and package it in the declared
 `jniLibs/arm64-v8a` path. A build without that exact file reports the missing
 provider and does not substitute another binary.
 
+For a read-only host-side inventory of exploit routes, physical PFN ranges,
+SELinux and module state, CPU PMU controls, KGSL, profiler tools, and Vulkan/GLES
+drivers, run:
+
+```sh
+python3 tools/device_preflight.py SERIAL
+python3 tools/device_preflight.py SERIAL --live-cpu
+python3 tools/device_preflight.py SERIAL --live-cpu --format json
+```
+
+The report evaluates routes independently. A missing KMI module does not hide
+an exact direct-kernel match, and driver files or a world-readable KGSL node are
+reported as capability hints until a live counter workload proves access. The
+CPU smoke test selects event names advertised by the device, including legacy
+raw aliases, and preserves both the selected names and measured counts.
+
 Boot startup delegates to the same foreground service and requests only an
 unattended strategy. A target that needs a host-side daemon restart is
 reported as interaction-required and is not armed during boot.
