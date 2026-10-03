@@ -191,6 +191,11 @@ an exact direct-kernel match, and driver files or a world-readable KGSL node are
 reported as capability hints until a live counter workload proves access. The
 CPU smoke test selects event names advertised by the device, including legacy
 raw aliases, and preserves both the selected names and measured counts.
+Build identity is also reported as a canonical SHA-256 so target registries can
+match an exact build without publishing model or device strings. Memory output
+keeps the disjoint System RAM segments from `/proc/iomem`, the online block
+ranges from sysfs, and the broader zone envelope as separate evidence. Tool and
+driver discovery covers system, extension, product, vendor, and ODM partitions.
 
 Boot startup delegates to the same foreground service and requests only an
 unattended strategy. A target that needs a host-side daemon restart is
