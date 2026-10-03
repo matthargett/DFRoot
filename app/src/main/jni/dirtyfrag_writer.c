@@ -105,6 +105,84 @@ int dirtyfrag_read_protected(struct DirtyFragWriter *writer, off_t offset,
     return -1;
 }
 
+static ssize_t read_fully(int fd, void *buffer, size_t length) {
+    uint8_t *bytes = buffer;
+    size_t total = 0;
+    while (total < length) {
+        ssize_t count = TEMP_FAILURE_RETRY(
+            read(fd, bytes + total, length - total));
+        if (count <= 0) return count < 0 ? -1 : (ssize_t)total;
+        total += (size_t)count;
+    }
+    return (ssize_t)total;
+}
+
+int dirtyfrag_identity_protected(struct DirtyFragWriter *writer,
+                                 off_t *size, uint8_t digest[32],
+                                 struct Reporter *reporter) {
+    if (!writer->bridge_path || !writer->protected_path || !size || !digest)
+        return -1;
+    int pipe_fds[2];
+    if (pipe(pipe_fds) < 0) {
+        REPORTLN("protected identity pipe failed: %s", strerror(errno));
+        return -1;
+    }
+
+    int pid = (int)syscall(__NR_clone, SIGCHLD | CLONE_VFORK | CLONE_VM,
+                           0, 0, 0, 0);
+    if (pid < 0) {
+        REPORTLN("protected identity vfork failed: %s", strerror(errno));
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
+        return -1;
+    }
+    if (pid == 0) {
+        close(pipe_fds[0]);
+        if (pipe_fds[1] != STDIN_FILENO) {
+            if (dup2(pipe_fds[1], STDIN_FILENO) < 0) _exit(1);
+            close(pipe_fds[1]);
+        }
+        execl(writer->bridge_path, "crashdump64", "0",
+              writer->protected_path, "i", NULL);
+        _exit(1);
+    }
+
+    close(pipe_fds[1]);
+    off_t observed_size = -1;
+    int result = read_fully(pipe_fds[0], &observed_size,
+                            sizeof(observed_size)) == sizeof(observed_size)
+            && observed_size >= 0 ? 0 : -1;
+    sha256_ctx context;
+    sha256_init(&context);
+    off_t received = 0;
+    uint8_t buffer[4096];
+    while (result == 0 && received < observed_size) {
+        size_t wanted = (size_t)(observed_size - received);
+        if (wanted > sizeof(buffer)) wanted = sizeof(buffer);
+        ssize_t count = TEMP_FAILURE_RETRY(read(pipe_fds[0], buffer, wanted));
+        if (count <= 0) {
+            result = -1;
+            break;
+        }
+        sha256_update(&context, buffer, (size_t)count);
+        received += count;
+    }
+    close(pipe_fds[0]);
+
+    int status = 0;
+    int waited = TEMP_FAILURE_RETRY(waitpid(pid, &status, 0));
+    if (waited != pid || !WIFEXITED(status) || WEXITSTATUS(status) != 0
+            || received != observed_size) {
+        REPORTLN("protected identity failed: wait=%d status=0x%x size=%lld received=%lld",
+                 waited, status, (long long)observed_size,
+                 (long long)received);
+        return -1;
+    }
+    sha256_final(&context, digest);
+    *size = observed_size;
+    return 0;
+}
+
 int dirtyfrag_drop_protected_cache(struct DirtyFragWriter *writer,
                                    struct Reporter *reporter) {
     if (!writer->bridge_path || !writer->protected_path) return -1;

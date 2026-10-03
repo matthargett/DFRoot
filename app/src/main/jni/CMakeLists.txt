@@ -33,6 +33,7 @@ add_library(exp SHARED
     targets/adbd_fd30e626.c
     targets/adbd_e52b5144.c
     targets/init_da101ea6.c
+    targets/init_10db7caf.c
     libcxx.S
     init_shell.S
     elf_parser.c)
@@ -46,6 +47,7 @@ ${CMAKE_SOURCE_DIR}/ko/dirtyfrag-android14-5.15.ko;\
 ${CMAKE_SOURCE_DIR}/ko/dirtyfrag-android15-6.6.ko;\
 ${CMAKE_SOURCE_DIR}/ko/dirtyfrag-android16-6.12.ko;\
 ${CMAKE_SOURCE_DIR}/ko/dirtyfrag-android17-6.18.ko;\
+${CMAKE_SOURCE_DIR}/ko/dirtyfrag-5.10.198-gaaf872b28b70-ab117.ko;\
 ${CMAKE_SOURCE_DIR}/splicehelper")
 
 set_source_files_properties(init_shell.S PROPERTIES OBJECT_DEPENDS

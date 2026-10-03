@@ -28,6 +28,9 @@ void dirtyfrag_writer_set_paths(struct DirtyFragWriter *writer,
                                 const char *protected_path);
 int dirtyfrag_read_protected(struct DirtyFragWriter *writer, off_t offset,
                              uint8_t bytes[16], struct Reporter *reporter);
+int dirtyfrag_identity_protected(struct DirtyFragWriter *writer,
+                                 off_t *size, uint8_t sha256[32],
+                                 struct Reporter *reporter);
 int dirtyfrag_drop_protected_cache(struct DirtyFragWriter *writer,
                                    struct Reporter *reporter);
 int dirtyfrag_patch_file(struct DirtyFragWriter *writer, const char *path,

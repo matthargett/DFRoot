@@ -30,7 +30,7 @@ The hook runs only in UID 0, TID 1. It forks a child, changes the child's group
 to `shell`, requests the `shell` execution context, and passes the embedded
 command directly to `/system/bin/sh -c`. It does not depend on an externally
 staged script or ask the `init` domain to create a `shell_data_file`. The
-channel exposes its status at `/data/local/tmp/dfroot-shell/status` and sets
+channel exposes its status at `/data/local/tmp/dfroot-command/status` and sets
 `debug.dfroot.ready=1` only after setup succeeds.
 
 The payload records separate failure markers for group change, SELinux

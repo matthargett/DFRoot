@@ -3,16 +3,25 @@
 
 #include <stdint.h>
 
+enum KoCompletion {
+    KO_LAUNCHES_KSUD = 0,
+    KO_MAKES_SELINUX_PERMISSIVE = 1,
+};
+
 struct KoImage {
+    const char *id;
+    const char *kernel_release;
     int android_release;
     int kernel_major;
     int kernel_minor;
+    enum KoCompletion completion;
     const char *start;
     const char *end;
 };
 
 const struct KoImage *select_ko_image(int android_release,
                                       int kernel_major, int kernel_minor);
+const struct KoImage *select_runtime_ko_image(void);
 int read_device_versions(int *android_release,
                          int *kernel_major, int *kernel_minor);
 

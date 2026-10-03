@@ -10,6 +10,7 @@
 // argv[3] = optional mode:
 //           "r" — write 16 bytes of file content to fd 0 (OUT_FD)
 //           "d" — drop the target's clean page-cache pages
+//           "i" — stream size and full content to fd 0 for identity hashing
 //           absent — splice 16 bytes of file page into fd 1 (PIPE_FD)
 
 #define OUT_FD  0
@@ -82,6 +83,41 @@ void start_c(void *argblock) {
         long rc = mysyscall4((unsigned long)file_fd, 0, 0,
                              POSIX_FADV_DONTNEED, __NR_fadvise64);
         mysyscall1((unsigned long)(rc == 0 ? 0 : 3), __NR_exit_group);
+    }
+
+    if (mode && streq(mode, "i")) {
+        off64_t size = (off64_t)mysyscall3(
+            (unsigned long)file_fd, 0, SEEK_END, __NR_lseek);
+        if (size < 0
+                || mysyscall3((unsigned long)file_fd, 0,
+                              SEEK_SET, __NR_lseek) < 0)
+            mysyscall1(1, __NR_exit_group);
+        if (mysyscall3(OUT_FD, 0, SEEK_CUR, __NR_lseek) != (long)-29L)
+            mysyscall1(3, __NR_exit_group);
+        if (mysyscall3(OUT_FD, (unsigned long)&size, sizeof(size),
+                       __NR_write) != (long)sizeof(size))
+            mysyscall1(2, __NR_exit_group);
+
+        unsigned char buf[4096];
+        off64_t total = 0;
+        while (total < size) {
+            unsigned long wanted = (unsigned long)(size - total);
+            if (wanted > sizeof(buf)) wanted = sizeof(buf);
+            long count = mysyscall3((unsigned long)file_fd,
+                                    (unsigned long)buf, wanted, __NR_read);
+            if (count <= 0) mysyscall1(1, __NR_exit_group);
+            long written = 0;
+            while (written < count) {
+                long step = mysyscall3(OUT_FD,
+                                       (unsigned long)(buf + written),
+                                       (unsigned long)(count - written),
+                                       __NR_write);
+                if (step <= 0) mysyscall1(2, __NR_exit_group);
+                written += step;
+            }
+            total += count;
+        }
+        mysyscall1(0, __NR_exit_group);
     }
 
     /* Splice mode: splice 16-byte page into PIPE_FD */

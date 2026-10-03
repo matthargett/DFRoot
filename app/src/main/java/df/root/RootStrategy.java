@@ -35,6 +35,13 @@ enum RootStrategy {
                     boolean softReboot) {
             return session.runInitShell(reporter);
         }
+    },
+    MODULE_INIT(4, true) {
+        @Override
+        int execute(Context context, IReporter reporter, DirtyFragSession session,
+                    boolean softReboot) {
+            return session.runModule(reporter, ExploitRunner.detectKoTarget(reporter), false);
+        }
     };
 
     final int nativeValue;

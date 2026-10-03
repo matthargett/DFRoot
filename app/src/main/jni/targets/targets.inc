@@ -2,3 +2,4 @@
 PATCH_TARGET(adbd_fd30e626)
 PATCH_TARGET(adbd_e52b5144)
 INIT_TARGET(init_da101ea6)
+INIT_TARGET(init_10db7caf)

@@ -1,5 +1,5 @@
 #!/system/bin/sh
-dir=/data/local/tmp/dfroot-shell
+dir=/data/local/tmp/dfroot-command
 umask 007
 
 fail() {
@@ -10,6 +10,7 @@ fail() {
 
 setprop debug.dfroot.error ''
 mkdir -p "$dir" || fail mkdir
+rm -f "$dir/in" "$dir/out" "$dir/status" || fail clear_stale_channel
 : > "$dir/in" || fail create_in
 : > "$dir/out" || fail create_out
 chmod 0660 "$dir/in" "$dir/out" || fail mode_channels

@@ -41,8 +41,9 @@ Ephemeral root for Samsung devices (and possibly others) w/ locked bootloaders v
 
 The app selects one exact strategy at runtime:
 
-1. A bundled module is selected only when both the Android KMI generation and
-   kernel major/minor match. A same-version module from another KMI is rejected.
+1. A bundled module first matches an exact full kernel release when one is
+   declared, then falls back to an exact Android KMI generation plus kernel
+   major/minor match. A same-version module from another KMI is rejected.
 2. An init hook target is selected by kernel release, carrier path, carrier
    SHA-256, and hook symbol. It starts a UID 0 command channel without a module.
 3. A protected daemon target is selected by kernel release and an exact bridge
@@ -65,7 +66,7 @@ The exploit is composed from small layers with one level of responsibility:
 | `dirtyfrag_writer.c` | CBC page-cache writes and protected-file bridge I/O |
 | `elf_hook.c` | Reversible ELF payload and trampoline transaction |
 | `patch_window.c` | Guard, apply, trigger window, reverse restore, and result state |
-| `payloads.c` | Embedded helpers and exact KMI module selection |
+| `payloads.c` | Embedded helpers, exact module selection, and completion contracts |
 | `target_registry.c` | Runtime identity matching and actionable rejection output |
 | `targets/*.c` | One declarative firmware target per source file |
 | `root_runtime.c` | Module and init strategy orchestration |
@@ -85,6 +86,8 @@ Current declarative userspace targets:
 | Target | Evidence state |
 |---|---|
 | `init-shell-da101ea6` | Composed target live verified a UID 0 command channel and exact restoration |
+| `init-shell-10db7caf` | Live verified a UID 0 command channel and exact restoration |
+| `kernel-5.10.198-gaaf872b28b70-ab117` + `init-shell-10db7caf` | Live verified from enforcing state and reproduced after a clean reboot |
 | `adbd-fd30e626` | Live verified UID 0 daemon and exact restoration |
 | `adbd-e52b5144` | Exact offline kernel and userspace analysis; live chain untested |
 
@@ -98,7 +101,7 @@ The exploit uses this primitive to patch shellcode into `libc++.so` in the kerne
 
 1. **IpSec transform** — App allocates a `UdpEncapsulationSocket` + SPI and builds an AES-CBC/HMAC-SHA256 ESP transform via `IpSecManager`.
 
-2. **splicehelper → crash_dump64** — The splicehelper binary is spliced into `crash_dump64` via the CBC primitive. `crash_dump64` runs in the `crash_dump` SELinux domain (via exec label transition), which can open `vendor_file` labeled files (untrusted_app context cannot read these files so we need this bridge). The splicehelper serves two modes: splice mode (pipe a 16-byte page chunk out to the parent for write) and read mode (`argv[3]="r"`, write 16 bytes of file content to a pipe fd for IV computation).
+2. **splicehelper → crash_dump64** — The splicehelper binary is spliced into `crash_dump64` via the CBC primitive. `crash_dump64` runs in the `crash_dump` SELinux domain (via exec label transition), which can open `vendor_file` labeled files (untrusted_app context cannot read these files so we need this bridge). The helper can splice a 16-byte page chunk, read one block for IV computation, stream a protected file for identity hashing, or drop its clean cache pages.
 
 3. **dirtyfrag.ko → vendor_file** — The kernel module is written via the crash_dump bridge (splicehelper splice mode) into a `vendor_file`-labeled file
 
@@ -108,15 +111,18 @@ The exploit uses this primitive to patch shellcode into `libc++.so` in the kerne
    - Clones a worker child (parent returns to init immediately)
    - Worker forks a grandchild; grandchild writes `u:r:vendor_modprobe:s0` to `/proc/self/attr/exec` then execs `/vendor/bin/insmod <ko_target>`
 
-5. **dirtyfrag.ko init** (runs as `vendor_modprobe`, uid=0) — The KO is loaded by `insmod` in the `vendor_modprobe` SELinux domain:
-   - Writes `false` to `selinux_state` (global permissive)
-   - Bypasses DEFEX via kprobes
-   - Calls `call_usermodehelper` to run launch the `ksud` binary from our app's data dir
-   - Module returns `-E2BIG` immediately after to self-unload
+5. **Module completion** — Each exact module image declares what successful
+   initialization provides. Existing KMI images launch `ksud`. An exact-release
+   image may instead make SELinux permissive, self-unload, and continue into a
+   separately guarded init-shell target.
 
 6. **Cleanup** — The libc++ hook is restored, the module
    carrier and `crash_dump64` are evicted from cache, and their pre-write
    identities are checked again.
+
+7. **Optional init-shell follow-up** — A module whose completion contract only
+   changes policy is followed by the independently selected init-shell target.
+   That hook is restored and checked through the same ELF transaction.
 
 ## Usage
 

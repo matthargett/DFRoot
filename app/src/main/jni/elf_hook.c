@@ -11,6 +11,62 @@ int find_hook_target(const char *path, const char *symbol,
                      uint64_t *hook, uint64_t *payload, uint32_t *first_insn,
                      struct Reporter *reporter);
 
+static int read_span(const char *path, uint64_t offset, void *bytes,
+                     size_t length) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    int result = fd >= 0
+        && pread(fd, bytes, length, (off_t)offset) == (ssize_t)length ? 0 : -1;
+    if (fd >= 0) close(fd);
+    return result;
+}
+
+static int patch_span_exact(struct DirtyFragWriter *writer,
+                            const char *path, const uint8_t *expected,
+                            size_t length, uint64_t offset,
+                            const char *phase, struct Reporter *reporter) {
+    int write_result = dirtyfrag_patch_file(writer, path, expected, length,
+                                            offset, 0, reporter);
+    uint8_t *observed = malloc(length);
+    if (!observed) return -1;
+
+    for (int pass = 1; pass <= 3; pass++) {
+        if (read_span(path, offset, observed, length) != 0) {
+            REPORTLN("ELF %s readback failed: %s+0x%lx",
+                     phase, path, offset);
+            free(observed);
+            return -1;
+        }
+        size_t mismatched = 0;
+        for (size_t block = 0; block < length / 16; block++) {
+            if (memcmp(observed + block * 16,
+                       expected + block * 16, 16) != 0)
+                mismatched++;
+        }
+        if (mismatched == 0) {
+            REPORTLN("ELF %s readback: exact pass=%d", phase, pass);
+            free(observed);
+            return 0;
+        }
+        REPORTLN("ELF %s readback: mismatch pass=%d blocks=%zu",
+                 phase, pass, mismatched);
+        if (pass == 3) break;
+
+        for (size_t block = 0; block < length / 16; block++) {
+            if (memcmp(observed + block * 16,
+                       expected + block * 16, 16) == 0)
+                continue;
+            if (dirtyfrag_patch_file(writer, path, expected + block * 16,
+                                     16, offset + block * 16,
+                                     0, reporter) != 0)
+                write_result = -1;
+        }
+        usleep(2000);
+    }
+
+    free(observed);
+    return write_result == 0 ? 1 : -1;
+}
+
 int install_elf_hook(struct DirtyFragWriter *writer,
                      const char *path, const char *symbol,
                      char *stage_data, uint32_t stage_length,
@@ -71,8 +127,9 @@ int install_elf_hook(struct DirtyFragWriter *writer,
     }
 
     REPORTLN("* patching ELF hook payload: %s", path);
-    int result = dirtyfrag_patch_file(writer, path, payload, padded_length,
-                                      payload_offset, 0, reporter);
+    int result = patch_span_exact(writer, path, (const uint8_t *)payload,
+                                  padded_length, payload_offset,
+                                  "payload patch", reporter);
     free(payload);
     if (result != 0) return result;
 
@@ -96,8 +153,8 @@ int install_elf_hook(struct DirtyFragWriter *writer,
            sizeof(hook_instruction));
     REPORTLN("* patching ELF hook trampoline: %s+0x%lx",
              path, hook_offset);
-    return dirtyfrag_patch_file(writer, path, block, sizeof(block),
-                                aligned_offset, 0, reporter);
+    return patch_span_exact(writer, path, block, sizeof(block),
+                            aligned_offset, "trampoline patch", reporter);
 }
 
 int restore_elf_hook(struct DirtyFragWriter *writer,
@@ -105,15 +162,18 @@ int restore_elf_hook(struct DirtyFragWriter *writer,
                      struct Reporter *reporter) {
     int write_result = 0;
     if (restore->trampoline_valid
-            && dirtyfrag_patch_file(writer, restore->path,
+            && patch_span_exact(writer, restore->path,
                     restore->trampoline_original,
                     sizeof(restore->trampoline_original),
-                    restore->trampoline_offset, 0, reporter) != 0)
+                    restore->trampoline_offset,
+                    "trampoline restore", reporter) != 0)
         write_result = -1;
     if (restore->payload_valid && restore->payload_original
-            && dirtyfrag_patch_file(writer, restore->path,
-                    restore->payload_original, restore->payload_length,
-                    restore->payload_offset, 0, reporter) != 0)
+            && patch_span_exact(writer, restore->path,
+                    (const uint8_t *)restore->payload_original,
+                    restore->payload_length,
+                    restore->payload_offset,
+                    "payload restore", reporter) != 0)
         write_result = -1;
     if (!restore->trampoline_valid && !restore->payload_valid) return 0;
 
