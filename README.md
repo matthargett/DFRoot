@@ -49,6 +49,13 @@ The app selects one exact strategy at runtime:
 3. A protected daemon target is selected by kernel release and an exact bridge
    identity, then checked through protected build-ID, file-end, and patch
    preimage blocks before any target byte is changed.
+4. An external direct-kernel provider is selected by exact device, fingerprint,
+   security patch, build incremental, kernel release, provider SHA-256, and any
+   declared physical PFN envelope.
+   Its dry probe must emit every declared offset marker before a live attempt.
+   The descriptor also declares whether the proven execution domain is the app
+   or ADB shell; the app does not retry a provider in a domain that cannot meet
+   its prerequisites.
 
 Every userspace patch is read back after application and restored in reverse
 order. The module path records the full bridge and carrier identities before
@@ -71,6 +78,11 @@ The exploit is composed from small layers with one level of responsibility:
 | `targets/*.c` | One declarative firmware target per source file |
 | `root_runtime.c` | Module and init strategy orchestration |
 | `exp.c` | JNI boundary and strategy composition |
+| `DirectKernelRegistry.java` | Exact external-provider identity and hash selection |
+| `PhysicalMemoryProbe.java` | Runtime PFN-envelope derivation and comparison |
+| `DirectKernelRunner.java` | Dry markers, bounded attempts, and result markers |
+| `DirectKernelShellLauncher.java` | Generated shell-domain guards and execution |
+| `RootService.java` | Foreground lifetime and durable per-operation report |
 
 To add a build, create one file under `app/src/main/jni/targets/`, add it to
 the native source list, and add one line to `targets/targets.inc`. Do not add a
@@ -90,6 +102,7 @@ Current declarative userspace targets:
 | `kernel-5.10.198-gaaf872b28b70-ab117` + `init-shell-10db7caf` | Live verified from enforcing state and reproduced after a clean reboot |
 | `adbd-fd30e626` | Live verified UID 0 daemon and exact restoration |
 | `adbd-e52b5144` | Exact offline kernel and userspace analysis; live chain untested |
+| `android10-4.4.205-49845030443200410` | Live verified fresh UID 0 ADB shell through the generated shell-domain launcher |
 
 ## How it works
 
@@ -140,6 +153,28 @@ service keeps the restoration watchdog in the foreground:
 ```sh
 adb shell am start-foreground-service -n df.root/.RootService
 ```
+
+Run only the read-only strategy and offset probe with:
+
+```sh
+adb shell am start-foreground-service -n df.root/.RootService \
+  --ez df.root.extra.PROBE_ONLY true
+adb shell run-as df.root cat \
+  /data/user_de/0/df.root/files/last-operation.log
+```
+
+When an exact descriptor requires the ADB shell domain, the probe writes and
+prints one launcher command. The generated script rechecks the running build,
+provider SHA-256, shell-visible PFN envelope, and all dry-probe markers. Whole
+attempts repeat only after the provider's exact clean allocator-exhaustion
+marker. A fresh `adb shell` must still prove UID, context, SELinux state, and
+the `adbd` credential change.
+
+Direct-kernel provider binaries are not committed by this project. Their local
+filenames are ignored by default. Obtain an exact provider under compatible
+terms, verify the descriptor's SHA-256, and package it in the declared
+`jniLibs/arm64-v8a` path. A build without that exact file reports the missing
+provider and does not substitute another binary.
 
 Boot startup delegates to the same foreground service and requests only an
 unattended strategy. A target that needs a host-side daemon restart is

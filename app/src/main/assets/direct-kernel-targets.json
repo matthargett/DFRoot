@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "targets": [
+    {
+      "id": "android10-4.4.205-49845030443200410",
+      "build_incremental": "49845030443200410",
+      "build_fingerprint": "oculus/vr_monterey/monterey:10/QQ3A.200805.001/49845030443200410:user/release-keys",
+      "device": "monterey",
+      "security_patch": "2024-07-05",
+      "kernel_release": "4.4.205-perf+",
+      "payload": {
+        "file": "libdfroot_direct_kernel_49845030443200410.so",
+        "sha256": "ecd366ceefc0bafd0ce8c35a9832ffcc425d2e80f915ccae0e8b48b881977056",
+        "distribution": "not_bundled",
+        "source": "https://github.com/darknight1050/quest1-bootloader-unlocker-web/tree/513ae57d7ddd0011059df0fb2a875375b3f99dec/binaries"
+      },
+      "physical_pfn_range": {
+        "source": "/proc/zoneinfo",
+        "observed_start": "0x80000",
+        "observed_unaligned_end": "0x17e4c0",
+        "configured_end": "0x180000",
+        "groups": 4,
+        "segment_pages": "0x40000",
+        "on_app_permission_denied": "use_descriptor"
+      },
+      "probe": {
+        "arguments": ["--dry-offsets"],
+        "success_markers": [
+          "incremental match=1 49845030443200410",
+          "match=1 release=4.4.205-perf+",
+          "dry offsets label=",
+          "dry task_offsets"
+        ],
+        "timeout_seconds": 20
+      },
+      "run": {
+        "execution_domain": "shell",
+        "execution_domain_reason": "the enforcing untrusted_app domain cannot lower security.perf_harden, leaving perf_event_paranoid=3 and blocking the proven KASLR leak",
+        "environment": {
+          "IONSTACK_STAGE": "full",
+          "IONSTACK_SPRAY_STALL": "memfd",
+          "IONSTACK_KS_CORE": "7",
+          "IONSTACK_KS_COLLISIONS": "4",
+          "IONSTACK_FOPS_SAFE_TABLE": "0",
+          "IONSTACK_TREE_ENTRY_WRITE": "1",
+          "IONSTACK_FOPS_LOCK_OWNER_MODE": "",
+          "IONSTACK_PAGE_SETUP_ATTEMPTS": "8",
+          "IONSTACK_MEMFD_GATE_MAX_FIRES": "1",
+          "IONSTACK_STALL_HOLD_MS": "6000",
+          "IONSTACK_PTRACE_ROUTE_ATTEMPTS": "1",
+          "IONSTACK_MIN_WINDOW": "1",
+          "IONSTACK_RECLAIM_PERF_COUNTERS": "1",
+          "IONSTACK_RECLAIM_PFN_IDENTITY": "1",
+          "IONSTACK_RECLAIM_PHYS_PFN_START": "0x80000",
+          "IONSTACK_RECLAIM_PHYS_PFN_END": "0x180000",
+          "IONSTACK_RECLAIM_REQUIRE_PFN_MATCH": "1",
+          "IONSTACK_PAYLOAD": "",
+          "IONSTACK_PAYLOAD_TIMEOUT": "120",
+          "IONSTACK_XRW_KMEM": "1",
+          "IONSTACK_XRW_ROOT": "1",
+          "IONSTACK_XRW_HOLD": "1",
+          "IONSTACK_ROOT_WALK_MAX": "110",
+          "IONSTACK_SELF_ROOT": "0",
+          "IONSTACK_KMEM_CFG_BUDGET": "20000",
+          "IONSTACK_PIPE_ORACLE_FAST": "1"
+        },
+        "success_markers": [
+          "ROOT VERDICT root=1",
+          "selinux_permissive=1 (1->0)",
+          "persist=1(adbd)"
+        ],
+        "retryable_markers": [
+          "stage fops-page FAILED base=0 after 8 attempts -- no usable kernel page, aborting cleanly before the route"
+        ],
+        "startup_timeout_seconds": 240,
+        "maximum_attempts": 2,
+        "retry_delay_ms": 1000
+      }
+    }
+  ]
+}
